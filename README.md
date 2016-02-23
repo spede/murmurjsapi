@@ -40,8 +40,8 @@ Description=Mumble API
 [Service]
 ExecStart=/usr/bin/node /dir/to/server.js
 Restart=on-failure
-User=spede
-Group=spede
+User=mumble-server
+Group=mumble-server
 Environment=PATH=/usr/bin:/usr/local/bin:/usr/sbin
 Environment=NODE_ENV=production
 WorkingDirectory=/opt/node/mumble
