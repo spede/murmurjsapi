@@ -173,13 +173,69 @@ router.post( '/:server/message', function(req, res) {
         } 
     );
 });
+
 /**
-* Currently, returns the server's usercount if the
-* the IP address the the request originates from isn't
-* connected to Mumble. Otherwise, returns select
-* information about the user as well.
+* Returns the virtual server's uptime and usercount
 */
-router.get( '/:server/status', function( req, res ) {
+router.get( '/:server/status', function(req, res) {
+    var server = req.params.server;
+    var json = {};
+    
+    Ice.Promise.try(
+        function() {
+            var iceOpt = new Ice.InitializationData();
+            iceOpt.properties = Ice.createProperties([], iceOpt.properties);
+            iceOpt.properties.setProperty('Ice.Default.EncodingVersion', '1.0');
+            comm = Ice.initialize( iceOpt ); 
+            
+            var proxy = comm.stringToProxy( "Meta:tcp -h localhost -p 6502" );
+            
+            return Murmur.MetaPrx.checkedCast( proxy );
+        }
+    ).then(
+        function(meta) {
+            return meta.getServer(server).then(
+                function(server) {
+                    if( !server ) {
+                        return res.json({"error" : "E_INVALID_SERVER"});
+                    }
+                    return server;
+                }
+            );
+        }
+    ).then(
+        function(server) {
+            return Ice.Promise.all(
+                server.getUptime().then(
+                    function(t) {
+                        json.uptime = t.toString();
+                }),
+                server.getUsers().then(
+                    function(u) {
+                        json.userCount = u.values().length.toString();
+                })
+            );
+        }
+    ).finally(
+        function() {
+            if( comm ) {
+                comm.destroy();
+            }
+            return res.json( json );
+        }
+    ).exception(
+        function( err ) {
+            console.log("[mumbleapp] " + err);
+            return res.json({ "error" : "E_NOT_FOUND" });
+        } 
+    );
+});
+
+/**
+* Returns mumble information the remote address accessing
+* this route, or E_NOT_FOUND if they are not connected
+*/
+router.get( '/:server/hit', function( req, res ) {
     var server = req.params.server;
     var address = req.headers['x-real-ip'];
     var json = { };
@@ -215,10 +271,10 @@ router.get( '/:server/status', function( req, res ) {
                     json.name = user.name;
                     json.channel = user.channel.toString();
                     json.ping = user.udpPing.toPrecision(4);
+                    return true;
                 }
             });
-            
-            json.userCount = users.values().length.toString();
+            if( !json.id ) json = { "error": "E_NOT_FOUND" };
         }
     ).finally(
         function() {
