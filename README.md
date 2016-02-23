@@ -44,7 +44,7 @@ User=mumble-server
 Group=mumble-server
 Environment=PATH=/usr/bin:/usr/local/bin:/usr/sbin
 Environment=NODE_ENV=production
-WorkingDirectory=/opt/node/mumble
+WorkingDirectory=/dir/to
 
 [Install]
 WantedBy=multi-user.target
