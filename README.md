@@ -29,9 +29,11 @@ proxy_set_header x-real-ip $remote_addr;
 Endpoints:
 https://yourdomain.tld/api/mumble/
 
-**Startup to /etc/systemd/system/mumbleapi.service on Debian Jessie**
+**Systemd start (Debian specific)**
 
 ```
+/etc/systemd/system/mumbleapi.service:
+
 [Unit]
 Description=Mumble API
 
