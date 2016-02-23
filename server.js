@@ -67,7 +67,9 @@ router.get( '/:server/user/:user', function(req, res) {
         }
     );
 });
-
+/**
+ * Returns the complete channel list
+ */
 router.get( '/:server/channels', function(req, res) {
     var server = req.params.server;
     var json = {};
@@ -114,7 +116,9 @@ router.get( '/:server/channels', function(req, res) {
 
 /**
 * Send a message :msg to the user :to on the
-* server :server
+* server :server.
+* For example:
+* $.post('/api/mumble/1/message', { to: "1", msg: "Hello"});
 */
 router.post( '/:server/message', function(req, res) {
     var server = req.params.server;
@@ -169,7 +173,12 @@ router.post( '/:server/message', function(req, res) {
         } 
     );
 });
-
+/**
+* Currently, returns the server's usercount if the
+* the IP address the the request originates from isn't
+* connected to Mumble. Otherwise, returns select
+* information about the user as well.
+*/
 router.get( '/:server/status', function( req, res ) {
     var server = req.params.server;
     var address = req.headers['x-real-ip'];
