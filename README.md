@@ -29,3 +29,23 @@ proxy_set_header x-real-ip $remote_addr;
 Endpoints:
 https://yourdomain.tld/api/mumble/
 
+**Startup to /etc/systemd/system/mumbleapi.service on Debian Jessie**
+
+```
+[Unit]
+Description=Mumble API
+
+[Service]
+ExecStart=/usr/bin/node /dir/to/server.js
+Restart=on-failure
+User=spede
+Group=spede
+Environment=PATH=/usr/bin:/usr/local/bin:/usr/sbin
+Environment=NODE_ENV=production
+WorkingDirectory=/opt/node/mumble
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then finally `sudo systemctl start mumbleapi.service`
