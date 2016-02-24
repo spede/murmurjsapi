@@ -5,13 +5,6 @@
 * Teemu Malinen 2016
 * https://github.com/spede/murmurjsapi
 */
-/**
-* Attempt at a RESTful JS/ice api for 
-* Mumble server
-*
-* Teemu Malinen 2016
-* https://github.com/spede/murmurjsapi
-*/
 var https = require('https');
 var fs = require('fs');
 var express = require('express');
