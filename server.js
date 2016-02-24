@@ -5,6 +5,13 @@
 * Teemu Malinen 2016
 * https://github.com/spede/murmurjsapi
 */
+/**
+* Attempt at a RESTful JS/ice api for 
+* Mumble server
+*
+* Teemu Malinen 2016
+* https://github.com/spede/murmurjsapi
+*/
 var https = require('https');
 var fs = require('fs');
 var express = require('express');
@@ -19,7 +26,6 @@ var opt = {
 	cert: fs.readFileSync('/path/to/fullchain.pem')
 };
 var httpsServer = https.createServer(opt, app);
-
 
 // Need to match what you've got in mumble-server.ini
 var host = 'localhost';
@@ -53,8 +59,13 @@ function ice(res) {
         }
     ).exception(
         function(error) {
-            console.log(sprintf('[mumbleapi]: %s', error));
-            return res.json({ "error": error });
+            switch(error.ice_name()) {
+                default:
+                    console.log(sprintf('[mumbleapi]: %s', error ));
+                    return res.json({ "error": "Uncaught error"});
+                    process.exit(1);
+                break;
+            }
         }
     );
 }
@@ -72,12 +83,14 @@ router.post( '/:server/kick', function(req, res) {
     var key = req.body.key;
     var json = {};
 
+    return res.json({ "error": "E_NOT_AUTHORIZED" });
+    
     ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {
-                    if( !server ) {
-                        return res.json({"error" : "E_INVALID_SERVER"});
+                    if(!server) {
+                        return res.json({"error": "Invalid server id" });
                     }
                     server.kickUser(user).then(
                         function() {
@@ -85,6 +98,24 @@ router.post( '/:server/kick', function(req, res) {
                     });
                 }
             );
+        }
+    ).exception(
+        function(error) {
+            switch(error.ice_name()) {
+               
+                case "Murmur::ServerBootedException":
+                    return res.json({ "error": "Invalid server id" });
+                break;
+                case "Murmur::InvalidSessionException":
+                    console.log("bar");
+                    return res.json({ "error": "No such user"});
+                break;
+                default:
+                    console.log(sprintf('[mumbleapi]: %s', error ));
+                    return res.json({ "error": "Uncaught error"});
+                    process.exit(1);
+                break;
+            }
         }
     ).finally(
         function() {
@@ -100,7 +131,7 @@ router.post( '/:server/kick', function(req, res) {
 /**
 * Returns the User struct
 * todo:
-*  - runkkaa kanavan nimi samaan paskaan
+* 
 */
 router.get( '/:server/user/:user', function(req, res) {
     var server = req.params.server;
@@ -111,20 +142,33 @@ router.get( '/:server/user/:user', function(req, res) {
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {
-                    if( !server ) {
-                        return res.json({"error" : "E_INVALID_SERVER"});
+                    if(!server) {
+                        return res.json({"error": "Invalid server id" });
                     }
                     return server.getState(id).then(
                         function(user) {
                             json = user;
                             json.address = "<redacted>";
-                        }).exception(
-			function(err) {
-			    json = {"error": "E_NOT_FOUND"};
-			}
-			);
+                        });
                 }
             );
+        }
+    ).exception(
+        function(error) {
+            switch(error.ice_name()) {
+               
+                case "Murmur::ServerBootedException":
+                    return res.json({ "error": "Invalid server id" });
+                break;
+                case "Murmur::InvalidSessionException":
+                    return res.json({ "error": "No such user"});
+                break;
+                default:
+                    console.log(sprintf('[mumbleapi]: %s', error ));
+                    return res.json({ "error": "Uncaught error"});
+                    process.exit(1);
+                break;
+            }
         }
     ).finally(
         function() {
@@ -144,8 +188,8 @@ router.get( '/:server/channels', function(req, res) {
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {
-                    if( !server ) {
-                        return res.json({"error" : "E_INVALID_SERVER"});
+                    if(!server) {
+                        return res.json({"error": "Invalid server id"});
                     }
                     return server.getChannels().then(
                         function( channels ) {
@@ -153,6 +197,19 @@ router.get( '/:server/channels', function(req, res) {
                         });
                 }
             );
+        }
+    ).exception(
+        function(error) {
+            switch(error.ice_name()) {
+                case "Murmur::ServerBootedException":
+                    return res.json({ "error": "Invalid server id" });
+                break;
+                default:
+                    console.log(sprintf('[mumbleapi]: %s', error ));
+                    return res.json({ "error": "Uncaught error"});
+                    process.exit(1);
+                break;
+            }
         }
     ).finally(
         function() {
@@ -178,8 +235,8 @@ router.post( '/:server/message', function(req, res) {
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {              
-                    if( !server ) {
-                        return res.json({"error" : "E_INVALID_SERVER"});
+                    if(!server) {
+                        return res.json({"error": "Invalid server id" });
                     }
 
                     return server.sendMessage(to, msg).then(
@@ -189,6 +246,22 @@ router.post( '/:server/message', function(req, res) {
                         }
                     );
                 });
+        }
+    ).exception(
+        function(error) {
+            switch(error.ice_name()) {
+                case "Murmur::ServerBootedException":
+                    return res.json({ "error": "Invalid server id"});
+                break;
+                case "Murmur::InvalidSessionException":
+                    return res.json({ "error": "No such user"});
+                break;
+                default:
+                    console.log(sprintf('[mumbleapi]: %s', error ));
+                    return res.json({ "error": "Uncaught error"});
+                    process.exit(1);
+                break;
+            }
         }
     ).finally(
         function() {
@@ -212,8 +285,8 @@ router.get( '/:server/status', function(req, res) {
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {
-                    if( !server ) {
-                        return res.json({"error" : "E_INVALID_SERVER"});
+                    if(!server) {
+                        return res.json({"error": "Invalid server id" });
                     }
                     return server;
                 }
@@ -231,6 +304,19 @@ router.get( '/:server/status', function(req, res) {
                         json.userCount = u.values().length.toString();
                 })
             );
+        }
+    ).exception(
+        function(error) {
+            switch(error.ice_name()) {
+                case "Murmur::ServerBootedException":
+                    return res.json({ "error": "Invalid server id" });
+                break;
+                default:
+                    console.log(sprintf('[mumbleapi]: %s', error ));
+                    return res.json({ "error": "Uncaught error"});
+                    process.exit(1);
+                break;
+            }
         }
     ).finally(
         function() {
@@ -255,8 +341,8 @@ router.get( '/:server/hit', function( req, res ) {
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {              
-                    if( !server ) {
-                        return res.json({"error" : "E_INVALID_SERVER"});
+                    if(!server) {
+                        return res.json({"error": "Invalid server id" });
                     }
                     return server.getUsers();
                 }
@@ -275,6 +361,19 @@ router.get( '/:server/hit', function( req, res ) {
                 }
             });
             if( !json.id ) json = { "error": "E_NOT_FOUND" };
+        }
+    ).exception(
+        function(error) {
+            switch(error.ice_name()) {
+                case "Murmur::ServerBootedException":
+                    return res.json({ "error": "Invalid server id" });
+                break;
+                default:
+                    console.log(sprintf('[mumbleapi]: %s', error ));
+                    return res.json({ "error": "Uncaught error"});
+                    process.exit(1);
+                break;
+            }
         }
     ).finally(
         function() {
@@ -297,3 +396,4 @@ app.get('/api/*', function(req, res) {
 });
 
 httpsServer.listen(15000);
+
