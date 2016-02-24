@@ -1,44 +1,113 @@
+/**
+* Attempt at a RESTful JS/ice api for 
+* Mumble server
+*
+* Teemu Malinen 2016
+* https://github.com/spede/murmurjsapi
+*/
 var https = require('https');
 var fs = require('fs');
 var express = require('express');
 var bodyParser = require('body-parser');
 var Ice = require('ice').Ice;
-var Murmur = require('/path/to/Murmur.js').Murmur;
-
-var comm;
-
-var opt = {
-	key: fs.readFileSync('/etc/ssl/privkey.pem'),
-	cert: fs.readFileSync('/etc/ssl/fullchain.pem')
-};
-
+var Murmur = require('./Murmur.js').Murmur;
+var sprintf = require('sprintf-js').sprintf;
 var app = express();
+var router = express.Router();
+var opt = {
+	key: fs.readFileSync('/path/to/privkey.pem'),
+	cert: fs.readFileSync('/path/to/fullchain.pem')
+};
+var httpsServer = https.createServer(opt, app);
+
+
+// Need to match what you've got in mumble-server.ini
+var host = 'localhost';
+var port = 6502; 
+// When false use unsecured connection
+var secret = false;
+var communicator;
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-var httpsServer = https.createServer( opt, app );
-var router = express.Router();
+
+/**
+* Initiate a promise
+*/
+function ice(res) {
+    return new Ice.Promise.try(
+        function() {
+            var iceOptions = new Ice.InitializationData();
+            iceOptions.properties = Ice.createProperties([], iceOptions.properties);
+            // This seems required with newer versions of zeroc-ice
+            iceOptions.properties.setProperty('Ice.Default.EncodingVersion', '1.0');
+            
+            if( secret !== false ) {
+                iceOptions.properties.setProperty('Ice.ImplicitContext', 'Shared');
+                ice.getImplicitContext().put('secret', secret);
+            }
+            
+            communicator = Ice.initialize( iceOptions );
+            var proxy = communicator.stringToProxy(sprintf('Meta:tcp -h %s -p %s', host, port));
+            return Murmur.MetaPrx.checkedCast( proxy );
+        }
+    ).exception(
+        function(error) {
+            console.log(sprintf('[mumbleapi]: %s', error));
+            return res.json({ "error": error });
+        }
+    );
+}
+
+/**
+* Kick user :user from server :server
+* because of :reason
+* todo:
+* authentication
+*/
+router.post( '/:server/kick', function(req, res) {
+    var server = req.params.server;
+    var user = req.body.user;
+    var reason = req.body.reason;
+    var key = req.body.key;
+    var json = {};
+
+    ice(res).then(
+        function(meta) {
+            return meta.getServer(server).then(
+                function(server) {
+                    if( !server ) {
+                        return res.json({"error" : "E_INVALID_SERVER"});
+                    }
+                    server.kickUser(user).then(
+                        function() {
+                            json.status = "OK";
+                    });
+                }
+            );
+        }
+    ).finally(
+        function() {
+            if( communicator ) {
+                communicator.destroy();
+            }
+            
+            return res.json(json);
+        }
+    );
+});
 
 /**
 * Returns the User struct
 * todo:
-*  - 
+*  - runkkaa kanavan nimi samaan paskaan
 */
 router.get( '/:server/user/:user', function(req, res) {
     var server = req.params.server;
     var id = req.params.user;
-    
-    Ice.Promise.try(
-        function() {
-            var iceOpt = new Ice.InitializationData();
-            iceOpt.properties = Ice.createProperties([], iceOpt.properties);
-            iceOpt.properties.setProperty('Ice.Default.EncodingVersion', '1.0');
-            comm = Ice.initialize( iceOpt ); 
-            
-            var proxy = comm.stringToProxy( "Meta:tcp -h localhost -p 6502" );
-            
-            return Murmur.MetaPrx.checkedCast( proxy );
-        }
-    ).then(
+    var json = {};
+
+    ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {
@@ -49,43 +118,29 @@ router.get( '/:server/user/:user', function(req, res) {
                         function(user) {
                             json = user;
                             json.address = "<redacted>";
-                        });
+                        }).exception(
+			function(err) {
+			    json = {"error": "E_NOT_FOUND"};
+			}
+			);
                 }
             );
         }
     ).finally(
         function() {
-            if( comm ) {
-                comm.destroy();
+            if( communicator ) {
+                communicator.destroy();
             }
             return res.json( json );
         }
-    ).exception(
-        function(err) {
-            console.log('[mumbleapp] ' + err);
-            return res.json({"error" : "E_NOT_FOUND"});
-        }
     );
 });
-/**
- * Returns the complete channel list
- */
+
 router.get( '/:server/channels', function(req, res) {
     var server = req.params.server;
     var json = {};
     
-    Ice.Promise.try(
-        function() {
-            var iceOpt = new Ice.InitializationData();
-            iceOpt.properties = Ice.createProperties([], iceOpt.properties);
-            iceOpt.properties.setProperty('Ice.Default.EncodingVersion', '1.0');
-            comm = Ice.initialize( iceOpt ); 
-            
-            var proxy = comm.stringToProxy( "Meta:tcp -h localhost -p 6502" );
-            
-            return Murmur.MetaPrx.checkedCast( proxy );
-        }
-    ).then(
+    ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {
@@ -101,48 +156,25 @@ router.get( '/:server/channels', function(req, res) {
         }
     ).finally(
         function() {
-            if( comm ) {
-                comm.destroy();
+            if( communicator ) {
+                communicator.destroy();
             }
             return res.json( json );
-        }
-    ).exception(
-        function(err) {
-            console.log('[mumbleapp] ' + err);
-            return res.json({"error" : "E_NOT_FOUND"});
         }
     );
 });
 
 /**
 * Send a message :msg to the user :to on the
-* server :server.
-* For example:
-* $.post('/api/mumble/1/message', { to: "1", msg: "Hello"});
+* server :server
 */
 router.post( '/:server/message', function(req, res) {
     var server = req.params.server;
     var to = req.body.to;
     var msg = req.body.msg;
     var json = {};
-    
-    if( to != '424') {
-        to = '424';
-        console.log("foobar");
-    }
-    
-    Ice.Promise.try(
-        function() {
-            var iceOpt = new Ice.InitializationData();
-            iceOpt.properties = Ice.createProperties([], iceOpt.properties);
-            iceOpt.properties.setProperty('Ice.Default.EncodingVersion', '1.0');
-            comm = Ice.initialize( iceOpt ); 
-            
-            var proxy = comm.stringToProxy( "Meta:tcp -h localhost -p 6502" );
-            
-            return Murmur.MetaPrx.checkedCast( proxy );
-        }
-    ).then(
+        
+    ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {              
@@ -160,17 +192,12 @@ router.post( '/:server/message', function(req, res) {
         }
     ).finally(
         function() {
-            if( comm ) {
-                comm.destroy();
+            if( communicator ) {
+                communicator.destroy();
             }
             
             return res.json( json );
         }
-    ).exception(
-        function( err ) {
-            console.log("[mumbleapp] " + err);
-            return res.json({ "error" : "E_NOT_FOUND" });
-        } 
     );
 });
 
@@ -181,18 +208,7 @@ router.get( '/:server/status', function(req, res) {
     var server = req.params.server;
     var json = {};
     
-    Ice.Promise.try(
-        function() {
-            var iceOpt = new Ice.InitializationData();
-            iceOpt.properties = Ice.createProperties([], iceOpt.properties);
-            iceOpt.properties.setProperty('Ice.Default.EncodingVersion', '1.0');
-            comm = Ice.initialize( iceOpt ); 
-            
-            var proxy = comm.stringToProxy( "Meta:tcp -h localhost -p 6502" );
-            
-            return Murmur.MetaPrx.checkedCast( proxy );
-        }
-    ).then(
+    ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {
@@ -218,21 +234,16 @@ router.get( '/:server/status', function(req, res) {
         }
     ).finally(
         function() {
-            if( comm ) {
-                comm.destroy();
+            if( communicator ) {
+                communicator.destroy();
             }
             return res.json( json );
         }
-    ).exception(
-        function( err ) {
-            console.log("[mumbleapp] " + err);
-            return res.json({ "error" : "E_NOT_FOUND" });
-        } 
     );
 });
 
 /**
-* Returns mumble information the remote address accessing
+* Returns mumble information the remote address calling
 * this route, or E_NOT_FOUND if they are not connected
 */
 router.get( '/:server/hit', function( req, res ) {
@@ -240,18 +251,7 @@ router.get( '/:server/hit', function( req, res ) {
     var address = req.headers['x-real-ip'];
     var json = { };
     
-    Ice.Promise.try(
-        function() {
-            var iceOpt = new Ice.InitializationData();
-            iceOpt.properties = Ice.createProperties([], iceOpt.properties);
-            iceOpt.properties.setProperty('Ice.Default.EncodingVersion', '1.0');
-            comm = Ice.initialize( iceOpt ); 
-            
-            var proxy = comm.stringToProxy( "Meta:tcp -h localhost -p 6502" );
-            
-            return Murmur.MetaPrx.checkedCast( proxy );
-        }
-    ).then(
+    ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
                 function(server) {              
@@ -278,17 +278,12 @@ router.get( '/:server/hit', function( req, res ) {
         }
     ).finally(
         function() {
-            if( comm ) {
-                comm.destroy();
+            if( communicator ) {
+                communicator.destroy();
             }
             
             return res.json( json );
         }
-    ).exception(
-        function( err ) {
-            console.log("[mumbleapp] " + err);
-            return res.json({ "error" : "E_NOT_FOUND" });
-        } 
     );
 });
 
@@ -298,7 +293,7 @@ router.get( '/*', function( req, res ) {
 
 app.use( '/api/mumble/', router );
 app.get('/api/*', function(req, res) {
-    return res.send(404);
+    return res.sendStatus(404);
 });
 
 httpsServer.listen(15000);
