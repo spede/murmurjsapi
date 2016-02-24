@@ -73,11 +73,8 @@ router.post( '/:server/kick', function(req, res) {
     var server = req.params.server;
     var user = req.body.user;
     var reason = req.body.reason;
-    var key = req.body.key;
     var json = {};
 
-    return res.json({ "error": "E_NOT_AUTHORIZED" });
-    
     ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
