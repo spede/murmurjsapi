@@ -1,0 +1,27 @@
+{
+  "name": "murmurjsapi",
+  "version": "1.0.0",
+  "description": "RESTful API for Murmur written in JavaScript",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spede/murmurjsapi.git"
+  },
+  "author": "spede",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/spede/murmurjsapi/issues"
+  },
+  "homepage": "https://github.com/spede/murmurjsapi#readme",
+  "dependencies": {
+    "body-parser": "^1.15.0",
+    "express": "^4.13.4",
+    "fs": "0.0.2",
+    "https": "^1.0.0",
+    "ice": "^3.6.1",
+    "sprintf-js": "^1.0.3"
+  }
+}
