@@ -119,6 +119,54 @@ router.post( '/:server/kick', function(req, res) {
 });
 
 /**
+ * Returns the full UserMap for server
+ * :server
+ */
+router.get( '/:server/users', function(req, res) {
+    var server = req.params.server;
+    var json = {};
+    
+    ice(res).then(
+        function(meta) {
+            return meta.getServer(server).then(
+                function(server) {
+                    if( !server ) {
+                        return res.json({"error": "Invalid server id"});
+                    }
+                    return server.getUsers().then(
+                        function(users) {
+                            var copy = users.values();
+                            // redact ip addresses
+                            // from public-facing APIs
+                            // remove if undesirable
+                            for( i = 0; i < copy.length; i++) {
+                                copy[i].address = '<redacted>';
+                            }
+                            json = copy;
+                        }
+                    );
+                }
+            );
+        }
+    ).exception(
+        function(error) {
+            switch(error.ice_name()) {
+                case "Murmur::ServerBootedException":
+                    return res.json({ "error": "Virtual server offline" });
+                break;
+            }
+        }
+    ).finally(
+        function() {
+            if(communicator) {
+                communicator.destroy();
+            }
+            return res.json(json);
+        }
+    );
+});
+
+/**
 * Returns the User struct for :user
 * on :server
 */
