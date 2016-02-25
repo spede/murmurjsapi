@@ -71,7 +71,7 @@ function ice(res) {
 */
 router.post( '/:server/kick', function(req, res) {
     var server = req.params.server;
-    var user = req.body.user;
+    var user = req.body.target;
     var reason = req.body.reason;
     var json = {};
 
@@ -267,7 +267,7 @@ router.get( '/:server/channels', function(req, res) {
 */
 router.post( '/:server/message', function(req, res) {
     var server = req.params.server;
-    var to = req.body.to;
+    var to = req.body.target;
     var msg = req.body.msg;
     var json = {};
         
