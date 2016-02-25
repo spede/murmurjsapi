@@ -119,9 +119,8 @@ router.post( '/:server/kick', function(req, res) {
 });
 
 /**
-* Returns the User struct
-* todo:
-* 
+* Returns the User struct for :user
+* on :server
 */
 router.get( '/:server/user/:user', function(req, res) {
     var server = req.params.server;
@@ -170,6 +169,9 @@ router.get( '/:server/user/:user', function(req, res) {
     );
 });
 
+/**
+ * Returns the full ChannelMap
+ */
 router.get( '/:server/channels', function(req, res) {
     var server = req.params.server;
     var json = {};
@@ -231,7 +233,6 @@ router.post( '/:server/message', function(req, res) {
 
                     return server.sendMessage(to, msg).then(
                         function() {
-                            console.log("[mumbleapp] ripulimestari=" + to);
                             json.status = "OK";
                         }
                     );
@@ -386,4 +387,3 @@ app.get('/api/*', function(req, res) {
 });
 
 httpsServer.listen(15000);
-
