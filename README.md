@@ -1,5 +1,5 @@
 # murmurjsapi
-RESTful api for Murmur written in JavaScript
+RESTful api for Murmur written in JavaScript and Ice
 
 # Work-in-progress
 
