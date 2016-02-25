@@ -10,6 +10,7 @@ By default at https://yourdomain.tld/api/mumble
 | **GET**               |                               |                               |
 |                       |                               |                               |
 | /:server/user/:user   |                               | Returns the User struct       |
+| /:server/users        |                               | Returns the full UserMap      |
 | /:server/channels     |                               | Returns the full ChannelMap   |
 | /:server/status       |                               | Returns uptime and usercount  |
 | /:server/hit          |                               | Returns the User struct for   |
