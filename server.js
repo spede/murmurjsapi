@@ -22,7 +22,7 @@ var httpsServer = https.createServer(opt, app);
 
 // Need to match what you've got in mumble-server.ini
 var host = 'localhost';
-var port = 6502; 
+var port = 6502;
 // When false use unsecured connection
 var secret = false;
 var communicator;
@@ -40,12 +40,12 @@ function ice(res) {
             iceOptions.properties = Ice.createProperties([], iceOptions.properties);
             // This seems required with newer versions of zeroc-ice
             iceOptions.properties.setProperty('Ice.Default.EncodingVersion', '1.0');
-            
+
             if( secret !== false ) {
                 iceOptions.properties.setProperty('Ice.ImplicitContext', 'Shared');
                 ice.getImplicitContext().put('secret', secret);
             }
-            
+
             communicator = Ice.initialize( iceOptions );
             var proxy = communicator.stringToProxy(sprintf('Meta:tcp -h %s -p %s', host, port));
             return Murmur.MetaPrx.checkedCast( proxy );
@@ -92,7 +92,6 @@ router.post( '/:server/kick', function(req, res) {
     ).exception(
         function(error) {
             switch(error.ice_name()) {
-               
                 case "Murmur::ServerBootedException":
                     return res.json({ "error": "Invalid server id" });
                 break;
@@ -112,7 +111,6 @@ router.post( '/:server/kick', function(req, res) {
             if( communicator ) {
                 communicator.destroy();
             }
-            
             return res.json(json);
         }
     );
@@ -125,7 +123,7 @@ router.post( '/:server/kick', function(req, res) {
 router.get( '/:server/users', function(req, res) {
     var server = req.params.server;
     var json = {};
-    
+
     ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
@@ -193,7 +191,6 @@ router.get( '/:server/user/:user', function(req, res) {
     ).exception(
         function(error) {
             switch(error.ice_name()) {
-               
                 case "Murmur::ServerBootedException":
                     return res.json({ "error": "Invalid server id" });
                 break;
@@ -223,7 +220,7 @@ router.get( '/:server/user/:user', function(req, res) {
 router.get( '/:server/channels', function(req, res) {
     var server = req.params.server;
     var json = {};
-    
+
     ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
@@ -270,11 +267,11 @@ router.post( '/:server/message', function(req, res) {
     var to = req.body.target;
     var msg = req.body.msg;
     var json = {};
-        
+
     ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
-                function(server) {              
+                function(server) {
                     if(!server) {
                         return res.json({"error": "Invalid server id" });
                     }
@@ -307,7 +304,6 @@ router.post( '/:server/message', function(req, res) {
             if( communicator ) {
                 communicator.destroy();
             }
-            
             return res.json( json );
         }
     );
@@ -319,7 +315,7 @@ router.post( '/:server/message', function(req, res) {
 router.get( '/:server/status', function(req, res) {
     var server = req.params.server;
     var json = {};
-    
+
     ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
@@ -369,17 +365,17 @@ router.get( '/:server/status', function(req, res) {
 
 /**
 * Returns mumble information the remote address calling
-* this route, or E_NOT_FOUND if they are not connected
+* this route, or { "error": "User not found" } when not found
 */
 router.get( '/:server/hit', function( req, res ) {
     var server = req.params.server;
     var address = req.headers['x-real-ip'];
     var json = { };
-    
+
     ice(res).then(
         function(meta) {
             return meta.getServer(server).then(
-                function(server) {              
+                function(server) {
                     if(!server) {
                         return res.json({"error": "Invalid server id" });
                     }
@@ -419,7 +415,7 @@ router.get( '/:server/hit', function( req, res ) {
             if( communicator ) {
                 communicator.destroy();
             }
-            
+
             return res.json( json );
         }
     );
