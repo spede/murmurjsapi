@@ -18,14 +18,17 @@ var opt = {
 	key: fs.readFileSync('/path/to/privkey.pem'),
 	cert: fs.readFileSync('/path/to/fullchain.pem')
 };
-var httpsServer = https.createServer(opt, app);
 
 // Need to match what you've got in mumble-server.ini
+// todo: move to a configuration file
 var host = 'localhost';
 var port = 6502;
 // When false use unsecured connection
 var secret = false;
 var communicator;
+// listens for https when true
+
+var httpsServer = https.createServer(opt, app);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -55,7 +58,6 @@ function ice(res) {
             switch(error.ice_name()) {
                 default:
                     console.log(sprintf('[mumbleapi]: %s', error ));
-                    return res.json({ "error": "Uncaught error"});
                     process.exit(1);
                 break;
             }
@@ -96,13 +98,14 @@ router.post( '/:server/kick', function(req, res) {
                     return res.json({ "error": "Invalid server id" });
                 break;
                 case "Murmur::InvalidSessionException":
-                    console.log("bar");
                     return res.json({ "error": "No such user"});
+                break;
+                case "Ice::MarshalException":
+                    return res.json({"error": "/kick requires a session id as an argument"});
                 break;
                 default:
                     console.log(sprintf('[mumbleapi]: %s', error ));
                     return res.json({ "error": "Uncaught error"});
-                    process.exit(1);
                 break;
             }
         }
@@ -165,7 +168,7 @@ router.get( '/:server/users', function(req, res) {
 });
 
 /**
-* Returns the User struct for :user
+* Returns the User struct for :user (session id)
 * on :server
 */
 router.get( '/:server/user/:user', function(req, res) {
@@ -197,10 +200,12 @@ router.get( '/:server/user/:user', function(req, res) {
                 case "Murmur::InvalidSessionException":
                     return res.json({ "error": "No such user"});
                 break;
+                case "Ice::MarshalException":
+                    return res.json({"error": "/user requires a session id as an argument"});
+                break;                
                 default:
                     console.log(sprintf('[mumbleapi]: %s', error ));
                     return res.json({ "error": "Uncaught error"});
-                    process.exit(1);
                 break;
             }
         }
@@ -210,6 +215,56 @@ router.get( '/:server/user/:user', function(req, res) {
                 communicator.destroy();
             }
             return res.json( json );
+        }
+    );
+});
+
+/**
+* Returns the User struct for :user (name)
+* on server :server.
+*/
+router.get( '/:server/userbyname/:name', function(req, res) {
+    var server = req.params.server;
+    var reqUserName = req.params.name;
+    var json = {"error": "User not found"};
+    ice(res).then(
+        function(meta) {
+            return meta.getServer(server).then(
+                function(server) {
+                    if(!server) {
+                        return res.json({"error":"Invalid server id"});
+                    }
+                    return server.getUsers().then(
+                        function(users) {
+                            users.values().forEach(function(u) {
+                                if( u.name == reqUserName ) {
+                                    json = u;
+                                    json.address = '<redacted>';
+                                }
+                            });
+                        }
+                    );
+                }  
+            );
+        }
+    ).exception(
+        function(error) {
+            switch(error.ice_name()) {
+                case "Murmur::InvalidSessionException":
+                    return res.json({ "error": "No such user"});
+                break;
+                default:
+                    console.log(sprintf('[mumbleapi]: %s', error ));
+                    return res.json({ "error": "Uncaught error"});
+                break;
+            }
+        }
+    ).finally(
+        function() {
+            if(communicator) {
+                communicator.destroy();
+            }
+            return res.json(json);
         }
     );
 });
@@ -244,7 +299,6 @@ router.get( '/:server/channels', function(req, res) {
                 default:
                     console.log(sprintf('[mumbleapi]: %s', error ));
                     return res.json({ "error": "Uncaught error"});
-                    process.exit(1);
                 break;
             }
         }
@@ -292,10 +346,12 @@ router.post( '/:server/message', function(req, res) {
                 case "Murmur::InvalidSessionException":
                     return res.json({ "error": "No such user"});
                 break;
+                case "Ice::MarshalException":
+                    return res.json({"error": "/message needs a session id as the first argument"});
+                break;                
                 default:
                     console.log(sprintf('[mumbleapi]: %s', error ));
                     return res.json({ "error": "Uncaught error"});
-                    process.exit(1);
                 break;
             }
         }
@@ -349,7 +405,6 @@ router.get( '/:server/status', function(req, res) {
                 default:
                     console.log(sprintf('[mumbleapi]: %s', error ));
                     return res.json({ "error": "Uncaught error"});
-                    process.exit(1);
                 break;
             }
         }
@@ -406,7 +461,6 @@ router.get( '/:server/hit', function( req, res ) {
                 default:
                     console.log(sprintf('[mumbleapi]: %s', error ));
                     return res.json({ "error": "Uncaught error"});
-                    process.exit(1);
                 break;
             }
         }
