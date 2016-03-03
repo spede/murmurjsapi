@@ -202,7 +202,7 @@ router.get( '/:server/user/:user', function(req, res) {
                 break;
                 case "Ice::MarshalException":
                     return res.json({"error": "/user requires a session id as an argument"});
-                break;                
+                break;
                 default:
                     console.log(sprintf('[mumbleapi]: %s', error ));
                     return res.json({ "error": "Uncaught error"});
@@ -348,7 +348,7 @@ router.post( '/:server/message', function(req, res) {
                 break;
                 case "Ice::MarshalException":
                     return res.json({"error": "/message needs a session id as the first argument"});
-                break;                
+                break;
                 default:
                     console.log(sprintf('[mumbleapi]: %s', error ));
                     return res.json({ "error": "Uncaught error"});
@@ -366,7 +366,8 @@ router.post( '/:server/message', function(req, res) {
 });
 
 /**
-* Returns the virtual server's uptime and usercount
+* Returns the virtual server's uptime, userCount
+* and registeredUserCount
 */
 router.get( '/:server/status', function(req, res) {
     var server = req.params.server;
@@ -393,7 +394,11 @@ router.get( '/:server/status', function(req, res) {
                 server.getUsers().then(
                     function(u) {
                         json.userCount = u.values().length.toString();
-                })
+                }),
+		server.getRegisteredUsers('').then(
+		    function(r) {
+			json.registeredUserCount = r.values().length.toString();
+		})
             );
         }
     ).exception(
