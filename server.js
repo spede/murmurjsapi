@@ -5,6 +5,7 @@
 * Teemu Malinen 2016
 * https://github.com/spede/murmurjsapi
 */
+
 var https = require('https');
 var fs = require('fs');
 var express = require('express');
@@ -20,7 +21,7 @@ var opt = {
 };
 
 // Need to match what you've got in mumble-server.ini
-// todo: move to a configuration file
+// todo: move to a configuration file.
 var host = 'localhost';
 var port = 6502;
 // When false use unsecured connection
